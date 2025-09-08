@@ -355,6 +355,27 @@ void wpas_p2p_scan_freqs(struct wpa_supplicant *wpa_s,
 					params, true, true, false);
 }
 
+static struct wpa_driver_scan_filter *
+wpas_p2p_build_filter_ssids(struct wpa_driver_scan_params *params, size_t *num_ssids)
+{
+	struct wpa_driver_scan_filter *ssids;
+	struct wpa_ssid *ssid;
+	size_t count;
+
+	*num_ssids = 0;
+
+	ssids = os_calloc(params->num_ssids, sizeof(struct wpa_driver_scan_filter));
+	if (ssids == NULL)
+		return NULL;
+
+	for (count = 0; count < params->num_ssids; count++) {
+		os_memcpy(ssids[*num_ssids].ssid, params->ssids[count].ssid, SSID_MAX_LEN);
+		ssids[*num_ssids].ssid_len = params->ssids[count].ssid_len;
+		(*num_ssids)++;
+	}
+
+	return ssids;
+}
 
 static void wpas_p2p_trigger_scan_cb(struct wpa_radio_work *work, int deinit)
 {
@@ -380,6 +401,9 @@ static void wpas_p2p_trigger_scan_cb(struct wpa_radio_work *work, int deinit)
 
 	if (!params->freqs)
 		wpas_p2p_scan_freqs(wpa_s, params, params->p2p_include_6ghz);
+	
+	params->filter_ssids = wpas_p2p_build_filter_ssids(
+		params, &params->num_filter_ssids);
 
 	ret = wpa_drv_scan(wpa_s, params);
 	if (ret == 0)
@@ -7449,6 +7473,7 @@ int wpas_p2p_find(struct wpa_supplicant *wpa_s, unsigned int timeout,
 
 	if (wpa_s->global->p2p_disabled || wpa_s->global->p2p == NULL ||
 	    wpa_s->p2p_in_provisioning) {
+		printf("%s: %d Debug: Reject p2p_find operation\n", __FUNCTION__, __LINE__);
 		wpa_dbg(wpa_s, MSG_DEBUG, "P2P: Reject p2p_find operation%s%s",
 			(wpa_s->global->p2p_disabled || !wpa_s->global->p2p) ?
 			" (P2P disabled)" : "",
